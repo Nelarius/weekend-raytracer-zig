@@ -1,6 +1,11 @@
+const hitable = @import("hitable.zig");
 const std = @import("std");
 const Ray = @import("ray.zig").Ray;
 const Vec3f = @import("vector.zig").Vec3f;
+
+const HitRecord = hitable.HitRecord;
+const Sphere = hitable.Sphere;
+const World = hitable.World;
 
 const c = @cImport({
     @cInclude("SDL.h");
@@ -20,10 +25,21 @@ const window_height: c_int = 320;
 extern fn SDL_GetWindowSurface(window: *c.SDL_Window) ?*c.SDL_Surface;
 extern fn setPixel(surf: *c.SDL_Surface, x: c_int, y: c_int, pixel: u32) void;
 
-fn color(r: Ray) Vec3f {
-    const unit_direction = r.direction.makeUnitVector();
-    const t = 0.5 * (unit_direction.y + 1.0);
-    return Vec3f.new(1.0, 1.0, 1.0).mul(1.0 - t).add(Vec3f.new(0.5, 0.7, 1.0).mul(t));
+fn color(r: Ray, w: *const World) Vec3f {
+    const maybe_hit = w.hit(r, 0.0, 1000.0);
+    if (maybe_hit) |hit| {
+        const n = r.pointAtParameter(hit.t).sub(Vec3f.new(0.0, 0.0, -1.0)).makeUnitVector();
+        // return n.add(Vec3f.one()).mul(0.5);
+        return Vec3f{
+            .x = 0.5 * (n.x + 1.0),
+            .y = 0.5 * (n.y + 1.0),
+            .z = 0.5 * (n.z + 1.0),
+        };
+    } else {
+        const unit_direction = r.direction.makeUnitVector();
+        const t = 0.5 * (unit_direction.y + 1.0);
+        return Vec3f.new(1.0, 1.0, 1.0).mul(1.0 - t).add(Vec3f.new(0.5, 0.7, 1.0).mul(t));
+    }
 }
 
 fn toBgra(r: u32, g: u32, b: u32) u32 {
@@ -50,6 +66,19 @@ pub fn main() !void {
 
     // Ray tracing takes place here
 
+    // 640 by 320
+    const lower_left_corner = Vec3f.new(-1.6, -0.8, -1.0);
+    const horizontal = Vec3f.new(3.2, 0.0, 0.0);
+    const vertical = Vec3f.new(0.0, 1.6, 0.0);
+    const origin = Vec3f.new(0.0, 0.0, 0.0);
+
+    const world = World{
+        .spheres = []const Sphere{
+            Sphere.new(Vec3f.new(0.0, 0.0, -1.0), 0.5),
+            Sphere.new(Vec3f.new(0.0, -100.5, -1.0), 100.0),
+        },
+    };
+
     {
         _ = c.SDL_LockSurface(surface);
         var idx: i32 = 0;
@@ -60,12 +89,12 @@ pub fn main() !void {
             const u = @intToFloat(f32, w) / @intToFloat(f32, window_width);
             const v = @intToFloat(f32, h) / @intToFloat(f32, window_height);
 
-            const r: f32 = 255.99 * u;
-            const g: f32 = 255.99 * v;
-            const b: f32 = 255.99 * 0.2;
+            const camera_horizontal = horizontal.mul(u);
+            const camera_vertical = vertical.mul(v);
 
-            // remember to flip the vertical coordinate!
-            setPixel(surface, w, window_height - h - 1, toBgra(@floatToInt(u32, r), @floatToInt(u32, g), @floatToInt(u32, b)));
+            const r = Ray.new(origin, lower_left_corner.add(camera_horizontal).add(camera_vertical));
+            const rgbf = color(r, &world);
+            setPixel(surface, w, window_height - h - 1, toBgra(@floatToInt(u32, 255.99 * rgbf.x), @floatToInt(u32, 255.99 * rgbf.y), @floatToInt(u32, 255.99 * rgbf.z)));
         }
         c.SDL_UnlockSurface(surface);
     }
