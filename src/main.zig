@@ -1,5 +1,6 @@
 const hitable = @import("hitable.zig");
 const std = @import("std");
+const rand = std.rand;
 const Ray = @import("ray.zig").Ray;
 const Vec3f = @import("vector.zig").Vec3f;
 
@@ -19,6 +20,7 @@ const SDL_WINDOWPOS_UNDEFINED = @bitCast(c_int, c.SDL_WINDOWPOS_UNDEFINED_MASK);
 
 const window_width: c_int = 640;
 const window_height: c_int = 320;
+const num_samples: i32 = 32;
 
 // For some reason, this isn't parsed automatically. According to SDL docs, the
 // surface pointer returned is optional!
@@ -80,21 +82,28 @@ pub fn main() !void {
     };
 
     {
+        var prng = rand.DefaultPrng.init(0);
         _ = c.SDL_LockSurface(surface);
         var idx: i32 = 0;
         while (idx < window_width * window_height) : (idx += 1) {
             const w = @mod(idx, window_width);
             const h = @divTrunc(idx, window_width);
+            var sample: i32 = 0;
+            var color_accum = Vec3f.zero();
 
-            const u = @intToFloat(f32, w) / @intToFloat(f32, window_width);
-            const v = @intToFloat(f32, h) / @intToFloat(f32, window_height);
+            while (sample < num_samples) : (sample += 1) {
+                const u = (@intToFloat(f32, w) + prng.random.float(f32)) / @intToFloat(f32, window_width);
+                const v = (@intToFloat(f32, h) + prng.random.float(f32)) / @intToFloat(f32, window_height);
 
-            const camera_horizontal = horizontal.mul(u);
-            const camera_vertical = vertical.mul(v);
+                const camera_horizontal = horizontal.mul(u);
+                const camera_vertical = vertical.mul(v);
 
-            const r = Ray.new(origin, lower_left_corner.add(camera_horizontal).add(camera_vertical));
-            const rgbf = color(r, &world);
-            setPixel(surface, w, window_height - h - 1, toBgra(@floatToInt(u32, 255.99 * rgbf.x), @floatToInt(u32, 255.99 * rgbf.y), @floatToInt(u32, 255.99 * rgbf.z)));
+                const r = Ray.new(origin, lower_left_corner.add(camera_horizontal).add(camera_vertical));
+                const color_sample = color(r, &world);
+                color_accum = color_accum.add(color_sample);
+            }
+            color_accum = color_accum.mul(1.0 / @intToFloat(f32, num_samples));
+            setPixel(surface, w, window_height - h - 1, toBgra(@floatToInt(u32, 255.99 * color_accum.x), @floatToInt(u32, 255.99 * color_accum.y), @floatToInt(u32, 255.99 * color_accum.z)));
         }
         c.SDL_UnlockSurface(surface);
     }
