@@ -1,4 +1,5 @@
 const math = @import("std").math;
+const Random = @import("std").rand.Random;
 
 pub fn Vector3(comptime T: type) type {
     return packed struct {
@@ -75,6 +76,16 @@ pub fn Vector3(comptime T: type) type {
                 .y = inv_n * self.y,
                 .z = inv_n * self.z,
             };
+        }
+
+        pub fn randomInUnitSphere(r: *Random) Self {
+            return while (true) {
+                const p = Vec3f.new(r.float(f32), r.float(f32), r.float(f32));
+                if (p.lengthSquared() < 1.0) {
+                    break p;
+                }
+            // WTF, why do we need an else for a while loop? O.o
+            } else Vec3f.zero();
         }
     };
 }

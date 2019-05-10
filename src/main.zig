@@ -27,16 +27,11 @@ const num_samples: i32 = 32;
 extern fn SDL_GetWindowSurface(window: *c.SDL_Window) ?*c.SDL_Surface;
 extern fn setPixel(surf: *c.SDL_Surface, x: c_int, y: c_int, pixel: u32) void;
 
-fn color(r: Ray, w: *const World) Vec3f {
+fn color(r: Ray, w: *const World, random: *rand.Random) Vec3f {
     const maybe_hit = w.hit(r, 0.0, 1000.0);
     if (maybe_hit) |hit| {
-        const n = r.pointAtParameter(hit.t).sub(Vec3f.new(0.0, 0.0, -1.0)).makeUnitVector();
-        // return n.add(Vec3f.one()).mul(0.5);
-        return Vec3f{
-            .x = 0.5 * (n.x + 1.0),
-            .y = 0.5 * (n.y + 1.0),
-            .z = 0.5 * (n.z + 1.0),
-        };
+        const target = hit.p.add(hit.n).add(Vec3f.randomInUnitSphere(random));
+        return color(Ray.new(hit.p, target.sub(hit.p)), w, random).mul(0.5);
     } else {
         const unit_direction = r.direction.makeUnitVector();
         const t = 0.5 * (unit_direction.y + 1.0);
@@ -99,7 +94,7 @@ pub fn main() !void {
                 const camera_vertical = vertical.mul(v);
 
                 const r = Ray.new(origin, lower_left_corner.add(camera_horizontal).add(camera_vertical));
-                const color_sample = color(r, &world);
+                const color_sample = color(r, &world, &prng.random);
                 color_accum = color_accum.add(color_sample);
             }
             color_accum = color_accum.mul(1.0 / @intToFloat(f32, num_samples));
