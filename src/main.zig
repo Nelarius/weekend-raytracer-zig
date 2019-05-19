@@ -1,4 +1,8 @@
 const hitable = @import("hitable.zig");
+const mat = @import("material.zig");
+const Material = mat.Material;
+const Lambertian = mat.Lambertian;
+const Metal = mat.Metal;
 const std = @import("std");
 const rand = std.rand;
 const Ray = @import("ray.zig").Ray;
@@ -21,17 +25,41 @@ const SDL_WINDOWPOS_UNDEFINED = @bitCast(c_int, c.SDL_WINDOWPOS_UNDEFINED_MASK);
 const window_width: c_int = 640;
 const window_height: c_int = 320;
 const num_samples: i32 = 32;
+const max_depth: i32 = 32;
 
 // For some reason, this isn't parsed automatically. According to SDL docs, the
 // surface pointer returned is optional!
 extern fn SDL_GetWindowSurface(window: *c.SDL_Window) ?*c.SDL_Surface;
 extern fn setPixel(surf: *c.SDL_Surface, x: c_int, y: c_int, pixel: u32) void;
 
-fn color(r: Ray, w: *const World, random: *rand.Random) Vec3f {
+fn colorNormal(r: Ray, w: *const World) Vec3f {
     const maybe_hit = w.hit(r, 0.0, 1000.0);
     if (maybe_hit) |hit| {
-        const target = hit.p.add(hit.n).add(Vec3f.randomInUnitSphere(random));
-        return color(Ray.new(hit.p, target.sub(hit.p)), w, random).mul(0.5);
+        const n = hit.n.makeUnitVector();
+        return n.add(Vec3f.one()).mul(0.5);
+    } else {
+        const unit_direction = r.direction.makeUnitVector();
+        const t = 0.5 * (unit_direction.y + 1.0);
+        return Vec3f.new(1.0, 1.0, 1.0).mul(1.0 - t).add(Vec3f.new(0.5, 0.7, 1.0).mul(t));
+    }
+}
+
+fn color(r: Ray, w: *const World, random: *rand.Random, depth: i32) Vec3f {
+    const maybe_hit = w.hit(r, 0.0, 1000.0);
+    if (maybe_hit) |hit| {
+        if (depth < max_depth) {
+            const maybe_scatter = switch (hit.material) {
+                Material.Lambertian => |l| l.scatter(hit, random),
+                Material.Metal => |m| m.scatter(r, hit, random),
+            };
+            if (maybe_scatter) |scatter| {
+                return color(scatter.ray, w, random, depth + 1).elementwiseMul(scatter.attenuation);
+            } else {
+                return Vec3f.zero();
+            }
+        } else {
+            return Vec3f.zero();
+        }
     } else {
         const unit_direction = r.direction.makeUnitVector();
         const t = 0.5 * (unit_direction.y + 1.0);
@@ -71,8 +99,10 @@ pub fn main() !void {
 
     const world = World{
         .spheres = []const Sphere{
-            Sphere.new(Vec3f.new(0.0, 0.0, -1.0), 0.5),
-            Sphere.new(Vec3f.new(0.0, -100.5, -1.0), 100.0),
+            Sphere.new(Vec3f.new(0.0, 0.0, -1.0), 0.5, Material.lambertian(Vec3f.new(0.8, 0.3, 0.3))),
+            Sphere.new(Vec3f.new(0.0, -100.5, -1.0), 100.0, Material.lambertian(Vec3f.new(0.8, 0.8, 0.0))),
+            Sphere.new(Vec3f.new(1.0, 0.0, -1.0), 0.5, Material.lambertian(Vec3f.new(0.8, 0.6, 0.2))),
+            Sphere.new(Vec3f.new(-1.0, 0.0, -1.0), 0.5, Material.metal(Vec3f.new(0.8, 0.8, 0.8), 1.0)),
         },
     };
 
@@ -94,7 +124,8 @@ pub fn main() !void {
                 const camera_vertical = vertical.mul(v);
 
                 const r = Ray.new(origin, lower_left_corner.add(camera_horizontal).add(camera_vertical));
-                const color_sample = color(r, &world, &prng.random);
+                const color_sample = color(r, &world, &prng.random, 0);
+                // const color_sample = colorNormal(r, &world);
                 color_accum = color_accum.add(color_sample);
             }
             color_accum = color_accum.mul(1.0 / @intToFloat(f32, num_samples));

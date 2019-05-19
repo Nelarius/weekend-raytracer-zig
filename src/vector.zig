@@ -57,6 +57,14 @@ pub fn Vector3(comptime T: type) type {
             };
         }
 
+        pub fn elementwiseMul(lhs: Self, rhs: Self) Self {
+            return Self{
+                .x = lhs.x * rhs.x,
+                .y = lhs.y * rhs.y,
+                .z = lhs.z * rhs.z
+            };
+        }
+
         pub fn length(self: Self) T {
             return math.sqrt(self.x * self.x + self.y * self.y + self.z * self.z);
         }
@@ -86,6 +94,10 @@ pub fn Vector3(comptime T: type) type {
                 }
             // WTF, why do we need an else for a while loop? O.o
             } else Vec3f.zero();
+        }
+
+        pub fn reflect(self: Self, n: Self) Self {
+            return self.sub(n.mul(2.0 * self.dot(n)));
         }
     };
 }

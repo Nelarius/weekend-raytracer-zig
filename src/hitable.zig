@@ -1,3 +1,5 @@
+const mat = @import("material.zig");
+const Material = @import("material.zig").Material;
 const math = @import("std").math;
 const Ray = @import("ray.zig").Ray;
 const Vec3f = @import("vector.zig").Vec3f;
@@ -6,16 +8,19 @@ pub const HitRecord = struct {
     pub t: f32,
     pub p: Vec3f,
     pub n: Vec3f,
+    pub material: mat.Material
 };
 
 pub const Sphere = struct {
     pub center: Vec3f,
     pub radius: f32,
+    pub material: Material,
 
-    pub fn new(center: Vec3f, radius: f32) Sphere {
+    pub fn new(center: Vec3f, radius: f32, material: Material) Sphere {
         return Sphere{
             .center = center,
             .radius = radius,
+            .material = material,
         };
     }
 
@@ -41,6 +46,7 @@ pub const Sphere = struct {
                         .t = t,
                         .p = hit_point,
                         .n = (hit_point.sub(self.center)).mul(1.0 / self.radius),
+                        .material = self.material
                     };
                 }
             }
@@ -53,6 +59,7 @@ pub const Sphere = struct {
                         .t = t,
                         .p = hit_point,
                         .n = (hit_point.sub(self.center)).mul(1.0 / self.radius),
+                        .material = self.material
                     };
                 }
             }
