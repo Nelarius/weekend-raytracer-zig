@@ -22,7 +22,7 @@ pub const Lambertian = struct {
     pub fn scatter(self: Lambertian, hit: HitRecord, rand: *Random) ?Scatter {
         const target = hit.p.add(hit.n.add(Vec3f.randomInUnitSphere(rand)));
         const attenuation = self.albedo;
-        const scattered_ray = Ray.new(hit.p, target.sub(hit.p));
+        const scattered_ray = Ray.new(hit.p, target.sub(hit.p).makeUnitVector());
         return Scatter.new(attenuation, scattered_ray);
     }
 };
@@ -34,7 +34,7 @@ pub const Metal = struct {
     pub fn scatter(self: Metal, ray: Ray, hit: HitRecord, rand: *Random) ?Scatter {
         const reflected = ray.direction.reflect(hit.n.makeUnitVector());
         const attenuation = self.albedo;
-        const scattered = Ray.new(hit.p, reflected.add(Vec3f.randomInUnitSphere(rand).mul(self.fuzz)));
+        const scattered = Ray.new(hit.p, reflected.add(Vec3f.randomInUnitSphere(rand).mul(self.fuzz)).makeUnitVector());
         return Scatter.new(attenuation, scattered);
     }
 };
@@ -82,9 +82,9 @@ pub const Dielectric = struct {
         if (refract(ray.direction, outward_normal, ni_over_nt)) |refracted_ray| {
             const refraction_prob = schlick(cosine, self.refraction_index);
             const out_dir = if (rand.float(f32) < refraction_prob) ray.direction.reflect(hit.n) else refracted_ray;
-            return Scatter.new(Vec3f.new(1.0, 1.0, 1.0), Ray.new(hit.p, out_dir));
+            return Scatter.new(Vec3f.new(1.0, 1.0, 1.0), Ray.new(hit.p, out_dir.makeUnitVector()));
         } else {
-            return Scatter.new(Vec3f.new(1.0, 1.0, 1.0), Ray.new(hit.p, ray.direction.reflect(hit.n)));
+            return Scatter.new(Vec3f.new(1.0, 1.0, 1.0), Ray.new(hit.p, ray.direction.reflect(hit.n).makeUnitVector()));
         }
     }
 };

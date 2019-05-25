@@ -125,7 +125,7 @@ pub fn main() !void {
                 const camera_horizontal = horizontal.mul(u);
                 const camera_vertical = vertical.mul(v);
 
-                const r = Ray.new(origin, lower_left_corner.add(camera_horizontal).add(camera_vertical));
+                const r = Ray.new(origin, lower_left_corner.add(camera_horizontal).add(camera_vertical).makeUnitVector());
                 const color_sample = color(r, &world, &prng.random, 0);
                 // const color_sample = colorNormal(r, &world);
                 color_accum = color_accum.add(color_sample);

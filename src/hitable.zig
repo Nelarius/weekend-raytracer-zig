@@ -35,7 +35,7 @@ pub const Sphere = struct {
         const a = ray.direction.dot(ray.direction);
         const b = oc.dot(ray.direction); // the factor 2.0 was moved out of b
         const c = oc.dot(oc) - self.radius * self.radius;
-        const discriminant = 4.0 * b * b - 4.0 * a * c;
+        const discriminant = b * b - a * c;
 
         if (discriminant > 0.0) {
             {
