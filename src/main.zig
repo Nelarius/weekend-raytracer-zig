@@ -44,6 +44,63 @@ fn colorNormal(r: Ray, w: *const World) Vec3f {
     }
 }
 
+
+fn colorAlbedo(r: Ray, w: *const World) Vec3f {
+    const maybe_hit = w.hit(r, 0.0001, 1000.0);
+    if (maybe_hit) |hit| {
+        return switch (hit.material) {
+            Material.Lambertian => |l| l.albedo,
+            Material.Metal => |m| m.albedo,
+            Material.Dielectric => |l| Vec3f.one(),
+        };
+    } else {
+        const unit_direction = r.direction.makeUnitVector();
+        const t = 0.5 * (unit_direction.y + 1.0);
+        return Vec3f.new(1.0, 1.0, 1.0).mul(1.0 - t).add(Vec3f.new(0.5, 0.7, 1.0).mul(t));
+    }
+}
+
+fn colorDepthHelper(r: Ray, w: *const World, random: *rand.Random, depth: i32) i32 {
+    const maybe_hit = w.hit(r, 0.0, 1000.0);
+    if (maybe_hit) |hit| {
+        if (depth < max_depth) {
+            const scatter = switch (hit.material) {
+                Material.Lambertian => |l| l.scatter(hit, random),
+                Material.Metal => |m| m.scatter(r, hit, random),
+                Material.Dielectric => |d| d.scatter(r, hit, random),
+            };
+            return colorDepthHelper(scatter.ray, w, random, depth + 1);
+        } else {
+            return depth;   // reached max depth
+        }
+    } else {
+        return depth;   // hit the sky
+    }
+}
+
+fn colorDepth(r: Ray, w: *const World, random: *rand.Random) Vec3f {
+    const depth = colorDepthHelper(r, w, random, 0);
+    return Vec3f.new(@intToFloat(f32, depth) / @intToFloat(f32, max_depth), 0.0, 0.0);
+}
+
+fn colorScattering(r: Ray, w: *const World, random: *rand.Random) Vec3f {
+    const maybe_hit = w.hit(r, 0.001, 1000.0);
+    if (maybe_hit) |hit| {
+        const scatter = switch (hit.material) {
+            Material.Lambertian => |l| l.scatter(hit, random),
+            Material.Metal => |m| m.scatter(r, hit, random),
+            Material.Dielectric => |d| d.scatter(r, hit, random),
+        };
+        const dir = scatter.ray.direction.makeUnitVector();
+        return dir.add(Vec3f.one()).mul(0.5);
+    } else {
+        const unit_direction = r.direction.makeUnitVector();
+        const t = 0.5 * (unit_direction.y + 1.0);
+        return Vec3f.new(1.0, 1.0, 1.0).mul(1.0 - t).add(Vec3f.new(0.5, 0.7, 1.0).mul(t));
+    }
+}
+
+
 fn color(r: Ray, world: *const World, random: *rand.Random, depth: i32) Vec3f {
     const maybe_hit = world.hit(r, 0.0, 1000.0);
     if (maybe_hit) |hit| {
@@ -98,9 +155,9 @@ pub fn main() !void {
         .spheres = []const Sphere{
             Sphere.new(Vec3f.new(0.0, 0.0, -1.0), 0.5, Material.lambertian(Vec3f.new(0.8, 0.3, 0.3))),
             Sphere.new(Vec3f.new(0.0, -100.5, -1.0), 100.0, Material.lambertian(Vec3f.new(0.8, 0.8, 0.0))),
-            Sphere.new(Vec3f.new(1.0, 0.0, -1.0), 0.5, Material.lambertian(Vec3f.new(0.8, 0.6, 0.2))),
+            Sphere.new(Vec3f.new(1.0, 0.0, -1.0), 0.5, Material.metal(Vec3f.new(0.8, 0.6, 0.2), 0.5)),
             Sphere.new(Vec3f.new(-1.0, 0.0, -1.0), 0.5, Material.dielectric(1.5)),
-            Sphere.new(Vec3f.new(-1.0, 0.0, -1.0), -0.45, Material.dielectric(1.5)),
+            // Sphere.new(Vec3f.new(-1.0, 0.0, -1.0), -0.45, Material.dielectric(1.5)),
         },
     };
 
@@ -123,7 +180,10 @@ pub fn main() !void {
 
                 const r = Ray.new(origin, lower_left_corner.add(camera_horizontal).add(camera_vertical).makeUnitVector());
                 const color_sample = color(r, &world, &prng.random, 0);
+                // const color_sample = colorScattering(r, &world, &prng.random);
+                // const color_sample = colorDepth(r, &world, &prng.random);
                 // const color_sample = colorNormal(r, &world);
+                // const color_sample = colorAlbedo(r, &world);
                 color_accum = color_accum.add(color_sample);
             }
             color_accum = color_accum.mul(1.0 / @intToFloat(f32, num_samples));
