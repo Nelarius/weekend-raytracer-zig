@@ -51,6 +51,7 @@ fn color(r: Ray, w: *const World, random: *rand.Random, depth: i32) Vec3f {
             const maybe_scatter = switch (hit.material) {
                 Material.Lambertian => |l| l.scatter(hit, random),
                 Material.Metal => |m| m.scatter(r, hit, random),
+                Material.Dielectric => |d| d.scatter(r, hit, random),
             };
             if (maybe_scatter) |scatter| {
                 return color(scatter.ray, w, random, depth + 1).elementwiseMul(scatter.attenuation);
@@ -102,7 +103,8 @@ pub fn main() !void {
             Sphere.new(Vec3f.new(0.0, 0.0, -1.0), 0.5, Material.lambertian(Vec3f.new(0.8, 0.3, 0.3))),
             Sphere.new(Vec3f.new(0.0, -100.5, -1.0), 100.0, Material.lambertian(Vec3f.new(0.8, 0.8, 0.0))),
             Sphere.new(Vec3f.new(1.0, 0.0, -1.0), 0.5, Material.lambertian(Vec3f.new(0.8, 0.6, 0.2))),
-            Sphere.new(Vec3f.new(-1.0, 0.0, -1.0), 0.5, Material.metal(Vec3f.new(0.8, 0.8, 0.8), 1.0)),
+            Sphere.new(Vec3f.new(-1.0, 0.0, -1.0), 0.5, Material.dielectric(1.5)),
+            Sphere.new(Vec3f.new(-1.0, 0.0, -1.0), -0.45, Material.dielectric(1.5)),
         },
     };
 
