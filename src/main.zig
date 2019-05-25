@@ -33,7 +33,7 @@ extern fn SDL_GetWindowSurface(window: *c.SDL_Window) ?*c.SDL_Surface;
 extern fn setPixel(surf: *c.SDL_Surface, x: c_int, y: c_int, pixel: u32) void;
 
 fn colorNormal(r: Ray, w: *const World) Vec3f {
-    const maybe_hit = w.hit(r, 0.0, 1000.0);
+    const maybe_hit = w.hit(r, 0.0001, 1000.0);
     if (maybe_hit) |hit| {
         const n = hit.n.makeUnitVector();
         return n.add(Vec3f.one()).mul(0.5);
@@ -44,20 +44,16 @@ fn colorNormal(r: Ray, w: *const World) Vec3f {
     }
 }
 
-fn color(r: Ray, w: *const World, random: *rand.Random, depth: i32) Vec3f {
-    const maybe_hit = w.hit(r, 0.0, 1000.0);
+fn color(r: Ray, world: *const World, random: *rand.Random, depth: i32) Vec3f {
+    const maybe_hit = world.hit(r, 0.0, 1000.0);
     if (maybe_hit) |hit| {
         if (depth < max_depth) {
-            const maybe_scatter = switch (hit.material) {
+            const scatter = switch (hit.material) {
                 Material.Lambertian => |l| l.scatter(hit, random),
                 Material.Metal => |m| m.scatter(r, hit, random),
                 Material.Dielectric => |d| d.scatter(r, hit, random),
             };
-            if (maybe_scatter) |scatter| {
-                return color(scatter.ray, w, random, depth + 1).elementwiseMul(scatter.attenuation);
-            } else {
-                return Vec3f.zero();
-            }
+            return color(scatter.ray, world, random, depth + 1).elementwiseMul(scatter.attenuation);
         } else {
             return Vec3f.zero();
         }
@@ -79,7 +75,7 @@ pub fn main() !void {
     }
     defer c.SDL_Quit();
 
-    const window = c.SDL_CreateWindow(c"it works", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, window_width, window_height, c.SDL_WINDOW_OPENGL) orelse {
+    const window = c.SDL_CreateWindow(c"weekend raytracer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, window_width, window_height, c.SDL_WINDOW_OPENGL) orelse {
         c.SDL_Log(c"Unable to create window: %s", c.SDL_GetError());
         return error.SDLInitializationFailed;
     };

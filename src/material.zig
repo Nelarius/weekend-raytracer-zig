@@ -19,7 +19,7 @@ pub const Scatter = struct {
 pub const Lambertian = struct {
     pub albedo: Vec3f,
 
-    pub fn scatter(self: Lambertian, hit: HitRecord, rand: *Random) ?Scatter {
+    pub fn scatter(self: Lambertian, hit: HitRecord, rand: *Random) Scatter {
         const target = hit.p.add(hit.n.add(Vec3f.randomInUnitSphere(rand)));
         const attenuation = self.albedo;
         const scattered_ray = Ray.new(hit.p, target.sub(hit.p).makeUnitVector());
@@ -31,7 +31,7 @@ pub const Metal = struct {
     albedo: Vec3f,
     fuzz: f32,
 
-    pub fn scatter(self: Metal, ray: Ray, hit: HitRecord, rand: *Random) ?Scatter {
+    pub fn scatter(self: Metal, ray: Ray, hit: HitRecord, rand: *Random) Scatter {
         const reflected = ray.direction.reflect(hit.n.makeUnitVector());
         const attenuation = self.albedo;
         const scattered = Ray.new(hit.p, reflected.add(Vec3f.randomInUnitSphere(rand).mul(self.fuzz)).makeUnitVector());
@@ -63,7 +63,7 @@ fn schlick(cosine: f32, refraction_index: f32) f32 {
 pub const Dielectric = struct {
     pub refraction_index: f32,
 
-    pub fn scatter(self: Dielectric, ray: Ray, hit: HitRecord, rand: *Random) ?Scatter {
+    pub fn scatter(self: Dielectric, ray: Ray, hit: HitRecord, rand: *Random) Scatter {
         // If the ray direction and hit normal are in the same half-sphere
         var outward_normal: Vec3f = undefined;
         var ni_over_nt: f32 = undefined;
