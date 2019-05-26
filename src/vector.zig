@@ -61,7 +61,7 @@ pub fn Vector3(comptime T: type) type {
             return Self{
                 .x = lhs.x * rhs.x,
                 .y = lhs.y * rhs.y,
-                .z = lhs.z * rhs.z
+                .z = lhs.z * rhs.z,
             };
         }
 
@@ -75,6 +75,14 @@ pub fn Vector3(comptime T: type) type {
 
         pub fn dot(a: Self, b: Self) T {
             return a.x * b.x + a.y * b.y + a.z * b.z;
+        }
+
+        pub fn cross(a: Self, b: Self) Self {
+            return Self{
+                .x = a.y * b.z - a.z * b.y,
+                .y = a.z * b.x - a.x * b.z,
+                .z = a.x * b.y - a.y * b.x,
+            };
         }
 
         pub fn makeUnitVector(self: Self) Self {
@@ -92,7 +100,7 @@ pub fn Vector3(comptime T: type) type {
                 if (p.lengthSquared() < 1.0) {
                     break p;
                 }
-            // WTF, why do we need an else for a while loop? O.o
+                // WTF, why do we need an else for a while loop? O.o
             } else Vec3f.zero();
         }
 
@@ -125,8 +133,17 @@ test "Vector3.sub" {
     assert(math.fabs(r.z - 1.0) < epsilon);
 }
 
-test "Vector.makeUnitVector" {
+test "Vector3.makeUnitVector" {
     const v = Vec3f.new(1.0, 2.0, 3.0);
     const uv = v.makeUnitVector();
     assert(math.fabs(uv.length() - 1.0) < epsilon);
+}
+
+test "Vector3.cross" {
+    const lhs = Vec3f.new(1.0, 0.0, 2.0);
+    const rhs = Vec3f.new(2.0, 1.0, 2.0);
+    const res = lhs.cross(rhs);
+    assert(math.fabs(res.x + 2.0) < epsilon);
+    assert(math.fabs(res.y - 2.0) < epsilon);
+    assert(math.fabs(res.z - 1.0) < epsilon);
 }

@@ -1,3 +1,4 @@
+const Camera = @import("camera.zig").Camera;
 const hitable = @import("hitable.zig");
 const mat = @import("material.zig");
 const Material = mat.Material;
@@ -44,7 +45,6 @@ fn colorNormal(r: Ray, w: *const World) Vec3f {
     }
 }
 
-
 fn colorAlbedo(r: Ray, w: *const World) Vec3f {
     const maybe_hit = w.hit(r, 0.0001, 1000.0);
     if (maybe_hit) |hit| {
@@ -71,10 +71,10 @@ fn colorDepthHelper(r: Ray, w: *const World, random: *rand.Random, depth: i32) i
             };
             return colorDepthHelper(scatter.ray, w, random, depth + 1);
         } else {
-            return depth;   // reached max depth
+            return depth; // reached max depth
         }
     } else {
-        return depth;   // hit the sky
+        return depth; // hit the sky
     }
 }
 
@@ -99,7 +99,6 @@ fn colorScattering(r: Ray, w: *const World, random: *rand.Random) Vec3f {
         return Vec3f.new(1.0, 1.0, 1.0).mul(1.0 - t).add(Vec3f.new(0.5, 0.7, 1.0).mul(t));
     }
 }
-
 
 fn color(r: Ray, world: *const World, random: *rand.Random, depth: i32) Vec3f {
     const maybe_hit = world.hit(r, 0.0, 1000.0);
@@ -146,10 +145,8 @@ pub fn main() !void {
     // Ray tracing takes place here
 
     // 640 by 320
-    const lower_left_corner = Vec3f.new(-1.6, -0.8, -1.0);
-    const horizontal = Vec3f.new(3.2, 0.0, 0.0);
-    const vertical = Vec3f.new(0.0, 1.6, 0.0);
-    const origin = Vec3f.new(0.0, 0.0, 0.0);
+    const aspect_ratio = @intToFloat(f32, window_width) / @intToFloat(f32, window_height);
+    const camera = Camera.new(Vec3f.new(-2.0, 2.0, 1.0), Vec3f.new(0.0, 0.0, -1.0), Vec3f.new(0.0, 1.0, 0.0), 30.0, aspect_ratio);
 
     const world = World{
         .spheres = []const Sphere{
@@ -157,7 +154,7 @@ pub fn main() !void {
             Sphere.new(Vec3f.new(0.0, -100.5, -1.0), 100.0, Material.lambertian(Vec3f.new(0.8, 0.8, 0.0))),
             Sphere.new(Vec3f.new(1.0, 0.0, -1.0), 0.5, Material.metal(Vec3f.new(0.8, 0.6, 0.2), 0.5)),
             Sphere.new(Vec3f.new(-1.0, 0.0, -1.0), 0.5, Material.dielectric(1.5)),
-            // Sphere.new(Vec3f.new(-1.0, 0.0, -1.0), -0.45, Material.dielectric(1.5)),
+            Sphere.new(Vec3f.new(-1.0, 0.0, -1.0), -0.45, Material.dielectric(1.5)),
         },
     };
 
@@ -175,10 +172,7 @@ pub fn main() !void {
                 const u = (@intToFloat(f32, w) + prng.random.float(f32)) / @intToFloat(f32, window_width);
                 const v = (@intToFloat(f32, h) + prng.random.float(f32)) / @intToFloat(f32, window_height);
 
-                const camera_horizontal = horizontal.mul(u);
-                const camera_vertical = vertical.mul(v);
-
-                const r = Ray.new(origin, lower_left_corner.add(camera_horizontal).add(camera_vertical).makeUnitVector());
+                const r = camera.makeRay(u, v);
                 const color_sample = color(r, &world, &prng.random, 0);
                 // const color_sample = colorScattering(r, &world, &prng.random);
                 // const color_sample = colorDepth(r, &world, &prng.random);
