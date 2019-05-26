@@ -57,7 +57,7 @@ fn refract(v: Vec3f, n: Vec3f, ni_over_nt: f32) ?Vec3f {
 fn schlick(cosine: f32, refraction_index: f32) f32 {
     var r0 = (1.0 - refraction_index) / (1.0 + refraction_index);
     r0 = r0 * r0;
-    return math.pow(f32, (1.0 - r0) * (1.0 - cosine), 5.0);
+    return r0 + (1.0 - r0) * math.pow(f32, (1.0 - cosine), 5.0);
 }
 
 pub const Dielectric = struct {
