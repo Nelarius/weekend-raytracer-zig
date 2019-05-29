@@ -104,6 +104,15 @@ pub fn Vector3(comptime T: type) type {
             } else Vec3f.zero();
         }
 
+        pub fn randomInUnitDisk(r: *Random) Self {
+            return while (true) {
+                const p = Vec3f.new(r.float(f32), r.float(f32), 0.0);
+                if (p.lengthSquared() < 1.0) {
+                    break p;
+                }
+            } else Vec3f.zero();
+        }
+
         pub fn reflect(self: Self, n: Self) Self {
             return self.sub(n.mul(2.0 * self.dot(n)));
         }

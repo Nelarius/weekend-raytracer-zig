@@ -144,9 +144,13 @@ pub fn main() !void {
 
     // Ray tracing takes place here
 
+    const lookfrom = Vec3f.new(-2.0, 2.0, 1.0);
+    const lookat = Vec3f.new(0.0, 0.0, -1.0);
+    const focus_distance = lookfrom.sub(lookat).length();
+    const aperture = 0.6;
     // 640 by 320
     const aspect_ratio = @intToFloat(f32, window_width) / @intToFloat(f32, window_height);
-    const camera = Camera.new(Vec3f.new(-2.0, 2.0, 1.0), Vec3f.new(0.0, 0.0, -1.0), Vec3f.new(0.0, 1.0, 0.0), 30.0, aspect_ratio);
+    const camera = Camera.new(lookfrom, lookat, Vec3f.new(0.0, 1.0, 0.0), 30.0, aspect_ratio, aperture, focus_distance);
 
     const world = World{
         .spheres = []const Sphere{
@@ -172,7 +176,7 @@ pub fn main() !void {
                 const u = (@intToFloat(f32, w) + prng.random.float(f32)) / @intToFloat(f32, window_width);
                 const v = (@intToFloat(f32, h) + prng.random.float(f32)) / @intToFloat(f32, window_height);
 
-                const r = camera.makeRay(u, v);
+                const r = camera.makeRay(&prng.random, u, v);
                 const color_sample = color(r, &world, &prng.random, 0);
                 // const color_sample = colorScattering(r, &world, &prng.random);
                 // const color_sample = colorDepth(r, &world, &prng.random);
