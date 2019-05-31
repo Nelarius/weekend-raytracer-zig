@@ -5,6 +5,8 @@ const Material = mat.Material;
 const Lambertian = mat.Lambertian;
 const Metal = mat.Metal;
 const std = @import("std");
+const debug = std.debug;
+const ArrayList = std.ArrayList;
 const rand = std.rand;
 const Ray = @import("ray.zig").Ray;
 const Vec3f = @import("vector.zig").Vec3f;
@@ -144,26 +146,51 @@ pub fn main() !void {
 
     // Ray tracing takes place here
 
-    const lookfrom = Vec3f.new(-2.0, 2.0, 1.0);
-    const lookat = Vec3f.new(0.0, 0.0, -1.0);
+    const lookfrom = Vec3f.new(16.0, 2.0, 4.0);
+    const lookat = Vec3f.new(0.0, 0.0, 0.0);
+    const vfov = 15.0;
     const focus_distance = lookfrom.sub(lookat).length();
-    const aperture = 0.6;
+    const aperture = 0.2;
     // 640 by 320
     const aspect_ratio = @intToFloat(f32, window_width) / @intToFloat(f32, window_height);
-    const camera = Camera.new(lookfrom, lookat, Vec3f.new(0.0, 1.0, 0.0), 30.0, aspect_ratio, aperture, focus_distance);
+    const camera = Camera.new(lookfrom, lookat, Vec3f.new(0.0, 1.0, 0.0), vfov, aspect_ratio, aperture, focus_distance);
 
-    const world = World{
-        .spheres = []const Sphere{
-            Sphere.new(Vec3f.new(0.0, 0.0, -1.0), 0.5, Material.lambertian(Vec3f.new(0.8, 0.3, 0.3))),
-            Sphere.new(Vec3f.new(0.0, -100.5, -1.0), 100.0, Material.lambertian(Vec3f.new(0.8, 0.8, 0.0))),
-            Sphere.new(Vec3f.new(1.0, 0.0, -1.0), 0.5, Material.metal(Vec3f.new(0.8, 0.6, 0.2), 0.5)),
-            Sphere.new(Vec3f.new(-1.0, 0.0, -1.0), 0.5, Material.dielectric(1.5)),
-            Sphere.new(Vec3f.new(-1.0, 0.0, -1.0), -0.45, Material.dielectric(1.5)),
-        },
-    };
+    var world = World.init();
+    defer world.deinit();
+
+    try world.spheres.append(Sphere.new(Vec3f.new(0.0, -1000.0, -1.0), 1000.0, Material.lambertian(Vec3f.new(0.5, 0.5, 0.5))));
+    try world.spheres.append(Sphere.new(Vec3f.new(0.0, 1.0, 0.0), 1.0, Material.dielectric(1.5)));
+    try world.spheres.append(Sphere.new(Vec3f.new(-4.0, 1.0, 0.0), 1.0, Material.lambertian(Vec3f.new(0.4, 0.2, 0.1))));
+    try world.spheres.append(Sphere.new(Vec3f.new(4.0, 1.0, 0.0), 1.0, Material.metal(Vec3f.new(0.7, 0.6, 0.5), 0.0)));
+
+    var prng = rand.DefaultPrng.init(0);
+
+    const sphere_offset = Vec3f.new(4.0, 0.2, 0.0);
+    var i: i32 = -5;
+    while (i < 5) : (i += 1) {
+        var j: i32 = -5;
+        while (j < 5) : (j += 1) {
+            const a = @intToFloat(f32, i);
+            const b = @intToFloat(f32, j);
+            const center = Vec3f.new(a + 0.9 * prng.random.float(f32), 0.2, b + 0.9 * prng.random.float(f32));
+            const choose_mat = prng.random.float(f32);
+            if (center.sub(sphere_offset).length() > 0.9) {
+                if (choose_mat < 0.8) {
+                    // diffuse
+                    const random_albedo = Vec3f.new(prng.random.float(f32), prng.random.float(f32), prng.random.float(f32));
+                    try world.spheres.append(Sphere.new(center, 0.2, Material.lambertian(random_albedo)));
+                } else if (choose_mat < 0.95) {
+                    // metal
+                    const random_albedo = Vec3f.new(prng.random.float(f32), prng.random.float(f32), prng.random.float(f32));
+                    try world.spheres.append(Sphere.new(center, 0.2, Material.metal(random_albedo, 0.5 * prng.random.float(f32))));
+                } else {
+                    try world.spheres.append(Sphere.new(center, 0.2, Material.dielectric(1.5)));
+                }
+            }
+        }
+    }
 
     {
-        var prng = rand.DefaultPrng.init(0);
         _ = c.SDL_LockSurface(surface);
         var idx: i32 = 0;
         while (idx < window_width * window_height) : (idx += 1) {

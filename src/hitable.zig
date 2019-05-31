@@ -1,6 +1,10 @@
+const std = @import("std");
+const math = std.math;
+const ArrayList = std.ArrayList;
+const debug = std.debug;
+
 const mat = @import("material.zig");
 const Material = @import("material.zig").Material;
-const math = @import("std").math;
 const Ray = @import("ray.zig").Ray;
 const Vec3f = @import("vector.zig").Vec3f;
 
@@ -70,13 +74,23 @@ pub const Sphere = struct {
 };
 
 pub const World = struct {
-    pub spheres: []const Sphere,
+    pub spheres: ArrayList(Sphere),
+
+    pub fn init() World {
+        return World {
+            .spheres = ArrayList(Sphere).init(debug.global_allocator)
+        };
+    }
+
+    pub fn deinit(self: *World) void {
+        self.spheres.deinit();
+    }
 
     pub fn hit(self: *const World, ray: Ray, t_min: f32, t_max: f32) ?HitRecord {
         var maybe_hit: ?HitRecord = null;
         var closest_so_far = t_max;
 
-        for (self.spheres) |sphere| {
+        for (self.spheres.toSlice()) |sphere| {
             if (sphere.hit(ray, t_min, t_max)) |hit_rec| {
                 if (hit_rec.t < closest_so_far) {
                     maybe_hit = hit_rec;
