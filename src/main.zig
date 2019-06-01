@@ -27,7 +27,7 @@ const SDL_WINDOWPOS_UNDEFINED = @bitCast(c_int, c.SDL_WINDOWPOS_UNDEFINED_MASK);
 
 const window_width: c_int = 640;
 const window_height: c_int = 320;
-const num_samples: i32 = 32;
+const num_samples: i32 = 256;
 const max_depth: i32 = 32;
 
 // For some reason, this isn't parsed automatically. According to SDL docs, the

@@ -81,7 +81,7 @@ pub const Dielectric = struct {
 
         if (refract(ray.direction, outward_normal, ni_over_nt)) |refracted_dir| {
             const reflection_prob = schlick(cosine, self.refraction_index);
-            return if (reflection_prob < rand.float(f32)) Scatter.new(Vec3f.one(), Ray.new(hit.p, ray.direction.reflect(hit.n).makeUnitVector())) else Scatter.new(Vec3f.one(), Ray.new(hit.p, refracted_dir.makeUnitVector()));
+            return if (rand.float(f32) < reflection_prob) Scatter.new(Vec3f.one(), Ray.new(hit.p, ray.direction.reflect(hit.n).makeUnitVector())) else Scatter.new(Vec3f.one(), Ray.new(hit.p, refracted_dir.makeUnitVector()));
         } else {
             return Scatter.new(Vec3f.one(), Ray.new(hit.p, ray.direction.reflect(hit.n).makeUnitVector()));
         }

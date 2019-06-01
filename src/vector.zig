@@ -106,7 +106,7 @@ pub fn Vector3(comptime T: type) type {
 
         pub fn randomInUnitDisk(r: *Random) Self {
             return while (true) {
-                const p = Vec3f.new(r.float(f32), r.float(f32), 0.0);
+                const p = Vec3f.new(2.0 * r.float(f32) - 1.0, 2.0 * r.float(f32) - 1.0, 0.0);
                 if (p.lengthSquared() < 1.0) {
                     break p;
                 }
