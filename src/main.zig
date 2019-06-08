@@ -36,7 +36,7 @@ extern fn SDL_GetWindowSurface(window: *c.SDL_Window) ?*c.SDL_Surface;
 extern fn setPixel(surf: *c.SDL_Surface, x: c_int, y: c_int, pixel: u32) void;
 
 fn colorNormal(r: Ray, w: *const World) Vec3f {
-    const maybe_hit = w.hit(r, 0.0001, 1000.0);
+    const maybe_hit = w.hit(r, 0.001, 10000.0);
     if (maybe_hit) |hit| {
         const n = hit.n.makeUnitVector();
         return n.add(Vec3f.one()).mul(0.5);
@@ -48,7 +48,7 @@ fn colorNormal(r: Ray, w: *const World) Vec3f {
 }
 
 fn colorAlbedo(r: Ray, w: *const World) Vec3f {
-    const maybe_hit = w.hit(r, 0.0001, 1000.0);
+    const maybe_hit = w.hit(r, 0.001, 10000.0);
     if (maybe_hit) |hit| {
         return switch (hit.material) {
             Material.Lambertian => |l| l.albedo,
@@ -63,7 +63,7 @@ fn colorAlbedo(r: Ray, w: *const World) Vec3f {
 }
 
 fn colorDepthHelper(r: Ray, w: *const World, random: *rand.Random, depth: i32) i32 {
-    const maybe_hit = w.hit(r, 0.0, 1000.0);
+    const maybe_hit = w.hit(r, 0.001, 10000.0);
     if (maybe_hit) |hit| {
         if (depth < max_depth) {
             const scatter = switch (hit.material) {
@@ -86,7 +86,7 @@ fn colorDepth(r: Ray, w: *const World, random: *rand.Random) Vec3f {
 }
 
 fn colorScattering(r: Ray, w: *const World, random: *rand.Random) Vec3f {
-    const maybe_hit = w.hit(r, 0.001, 1000.0);
+    const maybe_hit = w.hit(r, 0.001, 10000.0);
     if (maybe_hit) |hit| {
         const scatter = switch (hit.material) {
             Material.Lambertian => |l| l.scatter(hit, random),
@@ -103,7 +103,7 @@ fn colorScattering(r: Ray, w: *const World, random: *rand.Random) Vec3f {
 }
 
 fn color(r: Ray, world: *const World, random: *rand.Random, depth: i32) Vec3f {
-    const maybe_hit = world.hit(r, 0.0, 1000.0);
+    const maybe_hit = world.hit(r, 0.001, 10000.0);
     if (maybe_hit) |hit| {
         if (depth < max_depth) {
             const scatter = switch (hit.material) {
