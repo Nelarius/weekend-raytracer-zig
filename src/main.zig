@@ -2,16 +2,13 @@ const Camera = @import("camera.zig").Camera;
 const hitable = @import("hitable.zig");
 const mat = @import("material.zig");
 const Material = mat.Material;
-const Lambertian = mat.Lambertian;
-const Metal = mat.Metal;
 const std = @import("std");
-const debug = std.debug;
+const os = std.os;
 const ArrayList = std.ArrayList;
 const rand = std.rand;
 const Ray = @import("ray.zig").Ray;
 const Vec3f = @import("vector.zig").Vec3f;
 
-const HitRecord = hitable.HitRecord;
 const Sphere = hitable.Sphere;
 const World = hitable.World;
 
@@ -27,8 +24,9 @@ const SDL_WINDOWPOS_UNDEFINED = @bitCast(c_int, c.SDL_WINDOWPOS_UNDEFINED_MASK);
 
 const window_width: c_int = 640;
 const window_height: c_int = 320;
+const num_threads: i32 = 16;
 const num_samples: i32 = 256;
-const max_depth: i32 = 32;
+const max_depth: i32 = 16;
 
 // For some reason, this isn't parsed automatically. According to SDL docs, the
 // surface pointer returned is optional!
@@ -126,6 +124,51 @@ fn toBgra(r: u32, g: u32, b: u32) u32 {
     return 255 << 24 | r << 16 | g << 8 | b;
 }
 
+const ThreadContext = struct {
+    thread_index: i32,
+    num_pixels: i32,
+    chunk_size: i32,
+    rng: rand.DefaultPrng,
+    surface: *c.SDL_Surface,
+    world: *const World,
+    camera: *const Camera,
+};
+
+fn renderFn(context: ThreadContext) void {
+    const start_index = context.thread_index * context.chunk_size;
+    const end_index = if (start_index + context.chunk_size <= context.num_pixels) start_index + context.chunk_size else context.num_pixels;
+
+    var idx: i32 = start_index;
+    while (idx < end_index) : (idx += 1) {
+        const w = @mod(idx, window_width);
+        const h = @divTrunc(idx, window_width);
+        var sample: i32 = 0;
+        var color_accum = Vec3f.zero();
+
+        // This is an unholy hack to get rid of the const-qualifier for std.rand.Random.
+        // The context is immutable here :/
+        var random = blk: {
+            const intPtr = @ptrToInt(&context.rng.random);
+            break :blk @intToPtr(*rand.Random, intPtr);
+        };
+
+        while (sample < num_samples) : (sample += 1) {
+            const v = (@intToFloat(f32, h) + random.float(f32)) / @intToFloat(f32, window_height);
+            const u = (@intToFloat(f32, w) + random.float(f32)) / @intToFloat(f32, window_width);
+
+            const r = context.camera.makeRay(random, u, v);
+            const color_sample = color(r, context.world, random, 0);
+            // const color_sample = colorScattering(r, &world, &prng.random);
+            // const color_sample = colorDepth(r, &world, &prng.random);
+            // const color_sample = colorNormal(r, &world);
+            // const color_sample = colorAlbedo(r, &world);
+            color_accum = color_accum.add(color_sample);
+        }
+        color_accum = color_accum.mul(1.0 / @intToFloat(f32, num_samples));
+        setPixel(context.surface, w, window_height - h - 1, toBgra(@floatToInt(u32, 255.99 * color_accum.x), @floatToInt(u32, 255.99 * color_accum.y), @floatToInt(u32, 255.99 * color_accum.z)));
+    }
+}
+
 pub fn main() !void {
     if (c.SDL_Init(c.SDL_INIT_VIDEO) != 0) {
         c.SDL_Log(c"Unable to initialize SDL: %s", c.SDL_GetError());
@@ -150,7 +193,7 @@ pub fn main() !void {
     const lookat = Vec3f.new(0.0, 0.0, 0.0);
     const vfov = 15.0;
     const focus_distance = lookfrom.sub(lookat).length();
-    const aperture = 0.2;
+    const aperture = 0.4;
     // 640 by 320
     const aspect_ratio = @intToFloat(f32, window_width) / @intToFloat(f32, window_height);
     const camera = Camera.new(lookfrom, lookat, Vec3f.new(0.0, 1.0, 0.0), vfov, aspect_ratio, aperture, focus_distance);
@@ -192,28 +235,42 @@ pub fn main() !void {
 
     {
         _ = c.SDL_LockSurface(surface);
-        var idx: i32 = 0;
-        while (idx < window_width * window_height) : (idx += 1) {
-            const w = @mod(idx, window_width);
-            const h = @divTrunc(idx, window_width);
-            var sample: i32 = 0;
-            var color_accum = Vec3f.zero();
 
-            while (sample < num_samples) : (sample += 1) {
-                const u = (@intToFloat(f32, w) + prng.random.float(f32)) / @intToFloat(f32, window_width);
-                const v = (@intToFloat(f32, h) + prng.random.float(f32)) / @intToFloat(f32, window_height);
+        var tasks = ArrayList(*os.Thread).init(std.debug.global_allocator);
+        defer tasks.deinit();
 
-                const r = camera.makeRay(&prng.random, u, v);
-                const color_sample = color(r, &world, &prng.random, 0);
-                // const color_sample = colorScattering(r, &world, &prng.random);
-                // const color_sample = colorDepth(r, &world, &prng.random);
-                // const color_sample = colorNormal(r, &world);
-                // const color_sample = colorAlbedo(r, &world);
-                color_accum = color_accum.add(color_sample);
+        const chunk_size = blk: {
+            const num_pixels = window_width * window_height;
+            const n = num_pixels / num_threads;
+            const rem = num_pixels % num_threads;
+            if (rem > 0) {
+                break :blk n + 1;
+            } else {
+                break :blk n;
             }
-            color_accum = color_accum.mul(1.0 / @intToFloat(f32, num_samples));
-            setPixel(surface, w, window_height - h - 1, toBgra(@floatToInt(u32, 255.99 * color_accum.x), @floatToInt(u32, 255.99 * color_accum.y), @floatToInt(u32, 255.99 * color_accum.z)));
+        };
+
+        {
+            var ithread: i32 = 0;
+            while (ithread < num_threads) : (ithread += 1) {
+                const context = ThreadContext{
+                    .thread_index = ithread,
+                    .num_pixels = window_width * window_height,
+                    .chunk_size = chunk_size,
+                    .rng = rand.DefaultPrng.init(@intCast(u64, ithread)),
+                    .surface = surface,
+                    .world = &world,
+                    .camera = &camera,
+                };
+                const thread = try os.spawnThread(context, renderFn);
+                try tasks.append(thread);
+            }
         }
+
+        for (tasks.toSlice()) |task| {
+            task.wait();
+        }
+
         c.SDL_UnlockSurface(surface);
     }
 
