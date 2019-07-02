@@ -134,7 +134,7 @@ const ThreadContext = struct {
     camera: *const Camera,
 };
 
-fn renderFn(context: ThreadContext) void {
+fn renderFn(context: *ThreadContext) void {
     const start_index = context.thread_index * context.chunk_size;
     const end_index = if (start_index + context.chunk_size <= context.num_pixels) start_index + context.chunk_size else context.num_pixels;
 
@@ -145,19 +145,12 @@ fn renderFn(context: ThreadContext) void {
         var sample: i32 = 0;
         var color_accum = Vec3f.zero();
 
-        // This is an unholy hack to get rid of the const-qualifier for std.rand.Random.
-        // The context is immutable here :/
-        var random = blk: {
-            const intPtr = @ptrToInt(&context.rng.random);
-            break :blk @intToPtr(*rand.Random, intPtr);
-        };
-
         while (sample < num_samples) : (sample += 1) {
-            const v = (@intToFloat(f32, h) + random.float(f32)) / @intToFloat(f32, window_height);
-            const u = (@intToFloat(f32, w) + random.float(f32)) / @intToFloat(f32, window_width);
+            const v = (@intToFloat(f32, h) + context.rng.random.float(f32)) / @intToFloat(f32, window_height);
+            const u = (@intToFloat(f32, w) + context.rng.random.float(f32)) / @intToFloat(f32, window_width);
 
-            const r = context.camera.makeRay(random, u, v);
-            const color_sample = color(r, context.world, random, 0);
+            const r = context.camera.makeRay(&context.rng.random, u, v);
+            const color_sample = color(r, context.world, &context.rng.random, 0);
             // const color_sample = colorScattering(r, &world, &prng.random);
             // const color_sample = colorDepth(r, &world, &prng.random);
             // const color_sample = colorNormal(r, &world);
@@ -238,6 +231,8 @@ pub fn main() !void {
 
         var tasks = ArrayList(*os.Thread).init(std.debug.global_allocator);
         defer tasks.deinit();
+        var contexts = ArrayList(ThreadContext).init(std.debug.global_allocator);
+        defer contexts.deinit();
 
         const chunk_size = blk: {
             const num_pixels = window_width * window_height;
@@ -253,7 +248,7 @@ pub fn main() !void {
         {
             var ithread: i32 = 0;
             while (ithread < num_threads) : (ithread += 1) {
-                const context = ThreadContext{
+                try contexts.append(ThreadContext{
                     .thread_index = ithread,
                     .num_pixels = window_width * window_height,
                     .chunk_size = chunk_size,
@@ -261,8 +256,8 @@ pub fn main() !void {
                     .surface = surface,
                     .world = &world,
                     .camera = &camera,
-                };
-                const thread = try os.spawnThread(context, renderFn);
+                });
+                const thread = try os.spawnThread(&contexts.toSlice()[@intCast(usize, ithread)], renderFn);
                 try tasks.append(thread);
             }
         }
