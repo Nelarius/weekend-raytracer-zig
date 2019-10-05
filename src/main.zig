@@ -3,7 +3,6 @@ const hitable = @import("hitable.zig");
 const mat = @import("material.zig");
 const Material = mat.Material;
 const std = @import("std");
-const os = std.os;
 const ArrayList = std.ArrayList;
 const rand = std.rand;
 const Ray = @import("ray.zig").Ray;
@@ -229,7 +228,7 @@ pub fn main() !void {
     {
         _ = c.SDL_LockSurface(surface);
 
-        var tasks = ArrayList(*os.Thread).init(std.debug.global_allocator);
+        var tasks = ArrayList(*std.Thread).init(std.debug.global_allocator);
         defer tasks.deinit();
         var contexts = ArrayList(ThreadContext).init(std.debug.global_allocator);
         defer contexts.deinit();
@@ -257,7 +256,7 @@ pub fn main() !void {
                     .world = &world,
                     .camera = &camera,
                 });
-                const thread = try os.spawnThread(&contexts.toSlice()[@intCast(usize, ithread)], renderFn);
+                const thread = try std.Thread.spawn(&contexts.toSlice()[@intCast(usize, ithread)], renderFn);
                 try tasks.append(thread);
             }
         }

@@ -1,7 +1,7 @@
 const Builder = @import("std").build.Builder;
 
 pub fn build(b: *Builder) void {
-    const lib_cflags = [][]const u8{"-std=c99"};
+    const lib_cflags = [_][]const u8{"-std=c99"};
 
     const exe = b.addExecutable("zig-tracer", "src/main.zig");
     exe.setBuildMode(b.standardReleaseOptions());
