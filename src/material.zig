@@ -5,8 +5,8 @@ const Ray = @import("ray.zig").Ray;
 const Vec3f = @import("vector.zig").Vec3f;
 
 pub const Scatter = struct {
-    pub attenuation: Vec3f,
-    pub ray: Ray,
+    attenuation: Vec3f,
+    ray: Ray,
 
     pub fn new(attenuation: Vec3f, ray: Ray) Scatter {
         return Scatter{
@@ -17,7 +17,7 @@ pub const Scatter = struct {
 };
 
 pub const Lambertian = struct {
-    pub albedo: Vec3f,
+    albedo: Vec3f,
 
     pub fn scatter(self: Lambertian, hit: HitRecord, rand: *Random) Scatter {
         const target = hit.p.add(hit.n.add(Vec3f.randomInUnitSphere(rand)));
@@ -61,7 +61,7 @@ fn schlick(cosine: f32, refraction_index: f32) f32 {
 }
 
 pub const Dielectric = struct {
-    pub refraction_index: f32,
+    refraction_index: f32,
 
     pub fn scatter(self: Dielectric, ray: Ray, hit: HitRecord, rand: *Random) Scatter {
         // If the ray direction and hit normal are in the same half-sphere
