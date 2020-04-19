@@ -5,9 +5,9 @@ pub fn Vector3(comptime T: type) type {
     return packed struct {
         const Self = @This();
 
-        pub x: T,
-        pub y: T,
-        pub z: T,
+        x: T,
+        y: T,
+        z: T,
 
         pub fn new(x: T, y: T, z: T) Self {
             return Self{

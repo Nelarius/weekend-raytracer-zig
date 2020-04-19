@@ -1,8 +1,8 @@
 const Vec3f = @import("vector.zig").Vec3f;
 
 pub const Ray = struct {
-    pub origin: Vec3f,
-    pub direction: Vec3f,
+    origin: Vec3f,
+    direction: Vec3f,
 
     pub fn new(origin: Vec3f, direction: Vec3f) Ray {
         return Ray{

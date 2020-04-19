@@ -150,10 +150,10 @@ fn renderFn(context: *ThreadContext) void {
 
             const r = context.camera.makeRay(&context.rng.random, u, v);
             const color_sample = color(r, context.world, &context.rng.random, 0);
-            // const color_sample = colorScattering(r, &world, &prng.random);
-            // const color_sample = colorDepth(r, &world, &prng.random);
-            // const color_sample = colorNormal(r, &world);
-            // const color_sample = colorAlbedo(r, &world);
+            // const color_sample = colorScattering(r, context.world, &context.rng.random);
+            // const color_sample = colorDepth(r, context.world, &context.rng.random);
+            // const color_sample = colorNormal(r, context.world);
+            // const color_sample = colorAlbedo(r, context.world);
             color_accum = color_accum.add(color_sample);
         }
         color_accum = color_accum.mul(1.0 / @intToFloat(f32, num_samples));
@@ -163,19 +163,18 @@ fn renderFn(context: *ThreadContext) void {
 
 pub fn main() !void {
     if (c.SDL_Init(c.SDL_INIT_VIDEO) != 0) {
-        c.SDL_Log(c"Unable to initialize SDL: %s", c.SDL_GetError());
+        c.SDL_Log("Unable to initialize SDL: %s", c.SDL_GetError());
         return error.SDLInitializationFailed;
     }
     defer c.SDL_Quit();
 
-    const window = c.SDL_CreateWindow(c"weekend raytracer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, window_width, window_height, c.SDL_WINDOW_OPENGL) orelse {
-        c.SDL_Log(c"Unable to create window: %s", c.SDL_GetError());
+    const window = c.SDL_CreateWindow("weekend raytracer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, window_width, window_height, c.SDL_WINDOW_OPENGL) orelse {
+        c.SDL_Log("Unable to create window: %s", c.SDL_GetError());
         return error.SDLInitializationFailed;
     };
-    defer c.SDL_DestroyWindow(window);
 
     const surface = SDL_GetWindowSurface(window) orelse {
-        c.SDL_Log(c"Unable to get window surface: %s", c.SDL_GetError());
+        c.SDL_Log("Unable to get window surface: %s", c.SDL_GetError());
         return error.SDLInitializationFailed;
     };
 
@@ -228,9 +227,9 @@ pub fn main() !void {
     {
         _ = c.SDL_LockSurface(surface);
 
-        var tasks = ArrayList(*std.Thread).init(std.debug.global_allocator);
+        var tasks = ArrayList(*std.Thread).init(std.testing.allocator);
         defer tasks.deinit();
-        var contexts = ArrayList(ThreadContext).init(std.debug.global_allocator);
+        var contexts = ArrayList(ThreadContext).init(std.testing.allocator);
         defer contexts.deinit();
 
         const chunk_size = blk: {
@@ -256,12 +255,13 @@ pub fn main() !void {
                     .world = &world,
                     .camera = &camera,
                 });
-                const thread = try std.Thread.spawn(&contexts.toSlice()[@intCast(usize, ithread)], renderFn);
+                const thread = try std.Thread.spawn(&contexts.items[@intCast(usize, ithread)], renderFn);
+
                 try tasks.append(thread);
             }
         }
 
-        for (tasks.toSlice()) |task| {
+        for (tasks.items) |task| {
             task.wait();
         }
 
@@ -269,7 +269,7 @@ pub fn main() !void {
     }
 
     if (c.SDL_UpdateWindowSurface(window) != 0) {
-        c.SDL_Log(c"Error updating window surface: %s", c.SDL_GetError());
+        c.SDL_Log("Error updating window surface: %s", c.SDL_GetError());
         return error.SDLUpdateWindowFailed;
     }
 
