@@ -1,12 +1,8 @@
 const Builder = @import("std").build.Builder;
 
 pub fn build(b: *Builder) void {
-    const lib_cflags = [_][]const u8{"-std=c99"};
-
     const exe = b.addExecutable("zig-tracer", "src/main.zig");
     exe.setBuildMode(b.standardReleaseOptions());
-    exe.addCSourceFile("src/pixel.c", &lib_cflags);
-    exe.addIncludeDir("src/");
     exe.linkSystemLibrary("c");
 
     if (exe.target.isDarwin()) {

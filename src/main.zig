@@ -30,7 +30,12 @@ const max_depth: i32 = 16;
 // For some reason, this isn't parsed automatically. According to SDL docs, the
 // surface pointer returned is optional!
 extern fn SDL_GetWindowSurface(window: *c.SDL_Window) ?*c.SDL_Surface;
-extern fn setPixel(surf: *c.SDL_Surface, x: c_int, y: c_int, pixel: u32) void;
+fn setPixel(surf: *c.SDL_Surface, x: c_int, y: c_int, pixel: u32) void {
+  const target_pixel = @ptrToInt(surf.pixels) +
+      @intCast(usize, y) * @intCast(usize, surf.pitch) +
+      @intCast(usize, x) * 4;
+  @intToPtr(*u32, target_pixel).* = pixel;
+}
 
 fn colorNormal(r: Ray, w: *const World) Vec3f {
     const maybe_hit = w.hit(r, 0.001, 10000.0);
