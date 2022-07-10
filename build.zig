@@ -6,7 +6,7 @@ pub fn build(b: *Builder) void {
     exe.linkSystemLibrary("c");
 
     if (exe.target.isDarwin()) {
-        exe.addIncludeDir("/Library/Frameworks/SDL2.framework/Headers");
+        exe.addIncludeDir("/opt/homebrew/include/SDL2");
         exe.linkFramework("SDL2");
     } else {
         exe.linkSystemLibrary("SDL2");
