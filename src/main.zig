@@ -139,18 +139,18 @@ const ThreadContext = struct {
 };
 
 fn renderFn(context: *ThreadContext) void {
-    c.SDL_Log("run in thread");
-    c.SDL_Log("context.chunk_size: %d", context.chunk_size);
-    c.SDL_Log("context.thread_index: %d", context.thread_index);
+    // c.SDL_Log("run in thread");
+    // c.SDL_Log("context.chunk_size: %d", context.chunk_size);
+    // c.SDL_Log("context.thread_index: %d", context.thread_index);
     const start_index = context.thread_index * context.chunk_size;
     const end_index = if (start_index + context.chunk_size <= context.num_pixels) start_index + context.chunk_size else context.num_pixels;
 
     var idx: i32 = start_index;
-    c.SDL_Log("idx: %d", idx);
-    c.SDL_Log("start_index: %d", start_index);
-    c.SDL_Log("end_index: %d", end_index);
+    // c.SDL_Log("idx: %d", idx);
+    // c.SDL_Log("start_index: %d", start_index);
+    // c.SDL_Log("end_index: %d", end_index);
     while (idx < end_index) : (idx += 1) {
-        c.SDL_Log("run in loop %d", idx);
+        // c.SDL_Log("run in loop %d", idx);
         const w = @mod(idx, window_width);
         const h = @divTrunc(idx, window_width);
         var sample: i32 = 0;
@@ -249,8 +249,8 @@ pub fn main() !void {
 
         const chunk_size = blk: {
             const num_pixels = window_width * window_height;
-            const n = num_pixels / 1;
-            const rem = num_pixels % 1;
+            const n = num_pixels / num_threads;
+            const rem = num_pixels % num_threads;
             if (rem > 0) {
                 break :blk n + 1;
             } else {
@@ -258,38 +258,25 @@ pub fn main() !void {
             }
         };
 
-        // {
-        //     var ithread: i32 = 0;
-        //     while (ithread < num_threads) : (ithread += 1) {
-        //         try contexts.append(ThreadContext{
-        //             .thread_index = ithread,
-        //             .num_pixels = window_width * window_height,
-        //             .chunk_size = chunk_size,
-        //             .rng = rand.DefaultPrng.init(@intCast(u64, ithread)),
-        //             .surface = surface,
-        //             .world = &world,
-        //             .camera = &camera,
-        //         });
-
-        //         // const thread = try std.Thread.spawn(.{}, renderFn, contexts.items[@intCast(usize, ithread)]);
-
-        //         // try tasks.append(&thread);
-        //     }
-        // }
-
-        // for (tasks.items) |task| {
-        //     task.join();
-        // }
-        renderFn(
-            &ThreadContext{
-            .thread_index = 0,
-            .num_pixels = window_width * window_height,
-            .chunk_size = chunk_size,
-            .rng = rand.DefaultPrng.init(@intCast(u64, 0)),
-            .surface = surface,
-            .world = &world,
-            .camera = &camera,
-        });
+{
+            var ithread: i32 = 0;
+            while (ithread < num_threads) : (ithread += 1) {
+                c.SDL_Log("setThread: %d", ithread);
+                
+                var threadContext = ThreadContext{
+                    .thread_index = ithread,
+                    .num_pixels = window_width * window_height,
+                    .chunk_size = chunk_size,
+                    .rng = rand.DefaultPrng.init(@intCast(u64, ithread)),
+                    .surface = surface,
+                    .world = &world,
+                    .camera = &camera,
+                };
+                const thread = try std.Thread.spawn(.{}, renderFn, .{&threadContext});
+                thread.join();
+                // try tasks.append(&thread);
+            }
+        }
 
         c.SDL_UnlockSurface(surface);
     }
