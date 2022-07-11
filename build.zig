@@ -6,8 +6,21 @@ pub fn build(b: *Builder) void {
     exe.linkSystemLibrary("c");
 
     if (exe.target.isDarwin()) {
-        exe.addIncludeDir("/Library/Frameworks/SDL2.framework/Headers");
-        exe.linkFramework("SDL2");
+        exe.linkSystemLibrary("SDL2");
+        exe.linkSystemLibrary("iconv");
+        exe.linkFramework("AppKit");
+        exe.linkFramework("AudioToolbox");
+        exe.linkFramework("Carbon");
+        exe.linkFramework("Cocoa");
+        exe.linkFramework("CoreAudio");
+        exe.linkFramework("CoreFoundation");
+        exe.linkFramework("CoreGraphics");
+        exe.linkFramework("CoreHaptics");
+        exe.linkFramework("CoreVideo");
+        exe.linkFramework("ForceFeedback");
+        exe.linkFramework("GameController");
+        exe.linkFramework("IOKit");
+        exe.linkFramework("Metal");
     } else {
         exe.linkSystemLibrary("SDL2");
     }

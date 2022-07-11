@@ -23,7 +23,7 @@ const SDL_WINDOWPOS_UNDEFINED = @bitCast(c_int, c.SDL_WINDOWPOS_UNDEFINED_MASK);
 
 const window_width: c_int = 640;
 const window_height: c_int = 320;
-const num_threads: i32 = 16;
+const num_threads: i32 = 8;
 const num_samples: i32 = 256;
 const max_depth: i32 = 16;
 
@@ -31,10 +31,10 @@ const max_depth: i32 = 16;
 // surface pointer returned is optional!
 extern fn SDL_GetWindowSurface(window: *c.SDL_Window) ?*c.SDL_Surface;
 fn setPixel(surf: *c.SDL_Surface, x: c_int, y: c_int, pixel: u32) void {
-  const target_pixel = @ptrToInt(surf.pixels) +
-      @intCast(usize, y) * @intCast(usize, surf.pitch) +
-      @intCast(usize, x) * 4;
-  @intToPtr(*u32, target_pixel).* = pixel;
+    const target_pixel = @ptrToInt(surf.pixels) +
+        @intCast(usize, y) * @intCast(usize, surf.pitch) +
+        @intCast(usize, x) * 4;
+    @intToPtr(*u32, target_pixel).* = pixel;
 }
 
 fn colorNormal(r: Ray, w: *const World) Vec3f {
@@ -55,7 +55,7 @@ fn colorAlbedo(r: Ray, w: *const World) Vec3f {
         return switch (hit.material) {
             Material.Lambertian => |l| l.albedo,
             Material.Metal => |m| m.albedo,
-            Material.Dielectric => |l| Vec3f.one(),
+            Material.Dielectric => Vec3f.one(),
         };
     } else {
         const unit_direction = r.direction.makeUnitVector();
@@ -138,6 +138,9 @@ const ThreadContext = struct {
     camera: *const Camera,
 };
 
+var mutex = std.Thread.Mutex{};
+var threadDones: i32 = 0;
+
 fn renderFn(context: *ThreadContext) void {
     const start_index = context.thread_index * context.chunk_size;
     const end_index = if (start_index + context.chunk_size <= context.num_pixels) start_index + context.chunk_size else context.num_pixels;
@@ -150,11 +153,11 @@ fn renderFn(context: *ThreadContext) void {
         var color_accum = Vec3f.zero();
 
         while (sample < num_samples) : (sample += 1) {
-            const v = (@intToFloat(f32, h) + context.rng.random.float(f32)) / @intToFloat(f32, window_height);
-            const u = (@intToFloat(f32, w) + context.rng.random.float(f32)) / @intToFloat(f32, window_width);
+            const v = (@intToFloat(f32, h) + context.rng.random().float(f32)) / @intToFloat(f32, window_height);
+            const u = (@intToFloat(f32, w) + context.rng.random().float(f32)) / @intToFloat(f32, window_width);
 
-            const r = context.camera.makeRay(&context.rng.random, u, v);
-            const color_sample = color(r, context.world, &context.rng.random, 0);
+            const r = context.camera.makeRay(&context.rng.random(), u, v);
+            const color_sample = color(r, context.world, &context.rng.random(), 0);
             // const color_sample = colorScattering(r, context.world, &context.rng.random);
             // const color_sample = colorDepth(r, context.world, &context.rng.random);
             // const color_sample = colorNormal(r, context.world);
@@ -164,6 +167,9 @@ fn renderFn(context: *ThreadContext) void {
         color_accum = color_accum.mul(1.0 / @intToFloat(f32, num_samples));
         setPixel(context.surface, w, window_height - h - 1, toBgra(@floatToInt(u32, 255.99 * color_accum.x), @floatToInt(u32, 255.99 * color_accum.y), @floatToInt(u32, 255.99 * color_accum.z)));
     }
+    mutex.lock();
+    defer mutex.unlock();
+    threadDones += 1;
 }
 
 pub fn main() !void {
@@ -203,7 +209,6 @@ pub fn main() !void {
     try world.spheres.append(Sphere.new(Vec3f.new(4.0, 1.0, 0.0), 1.0, Material.metal(Vec3f.new(0.7, 0.6, 0.5), 0.0)));
 
     var prng = rand.DefaultPrng.init(0);
-
     const sphere_offset = Vec3f.new(4.0, 0.2, 0.0);
     var i: i32 = -5;
     while (i < 5) : (i += 1) {
@@ -211,17 +216,17 @@ pub fn main() !void {
         while (j < 5) : (j += 1) {
             const a = @intToFloat(f32, i);
             const b = @intToFloat(f32, j);
-            const center = Vec3f.new(a + 0.9 * prng.random.float(f32), 0.2, b + 0.9 * prng.random.float(f32));
-            const choose_mat = prng.random.float(f32);
+            const center = Vec3f.new(a + 0.9 * prng.random().float(f32), 0.2, b + 0.9 * prng.random().float(f32));
+            const choose_mat = prng.random().float(f32);
             if (center.sub(sphere_offset).length() > 0.9) {
                 if (choose_mat < 0.8) {
                     // diffuse
-                    const random_albedo = Vec3f.new(prng.random.float(f32), prng.random.float(f32), prng.random.float(f32));
+                    const random_albedo = Vec3f.new(prng.random().float(f32), prng.random().float(f32), prng.random().float(f32));
                     try world.spheres.append(Sphere.new(center, 0.2, Material.lambertian(random_albedo)));
                 } else if (choose_mat < 0.95) {
                     // metal
-                    const random_albedo = Vec3f.new(prng.random.float(f32), prng.random.float(f32), prng.random.float(f32));
-                    try world.spheres.append(Sphere.new(center, 0.2, Material.metal(random_albedo, 0.5 * prng.random.float(f32))));
+                    const random_albedo = Vec3f.new(prng.random().float(f32), prng.random().float(f32), prng.random().float(f32));
+                    try world.spheres.append(Sphere.new(center, 0.2, Material.metal(random_albedo, 0.5 * prng.random().float(f32))));
                 } else {
                     try world.spheres.append(Sphere.new(center, 0.2, Material.dielectric(1.5)));
                 }
@@ -260,15 +265,15 @@ pub fn main() !void {
                     .world = &world,
                     .camera = &camera,
                 });
-                const thread = try std.Thread.spawn(&contexts.items[@intCast(usize, ithread)], renderFn);
-
-                try tasks.append(thread);
+                var thread = try std.Thread.spawn(.{}, renderFn, .{&contexts.items[@intCast(usize, ithread)]});
+                try tasks.append(&thread);
             }
         }
 
-        for (tasks.items) |task| {
-            task.wait();
+        while (threadDones < num_threads) {
+            c.SDL_Delay(1000);
         }
+        
 
         c.SDL_UnlockSurface(surface);
     }
