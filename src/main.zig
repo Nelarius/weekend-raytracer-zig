@@ -23,7 +23,7 @@ const SDL_WINDOWPOS_UNDEFINED = @bitCast(c_int, c.SDL_WINDOWPOS_UNDEFINED_MASK);
 
 const window_width: c_int = 640;
 const window_height: c_int = 320;
-const num_threads: i32 = 16;
+const num_threads: i32 = 8;
 const num_samples: i32 = 256;
 const max_depth: i32 = 16;
 
@@ -138,19 +138,15 @@ const ThreadContext = struct {
     camera: *const Camera,
 };
 
+var mutex = std.Thread.Mutex{};
+var threadDones: i32 = 0;
+
 fn renderFn(context: *ThreadContext) void {
-    // c.SDL_Log("run in thread");
-    // c.SDL_Log("context.chunk_size: %d", context.chunk_size);
-    // c.SDL_Log("context.thread_index: %d", context.thread_index);
     const start_index = context.thread_index * context.chunk_size;
     const end_index = if (start_index + context.chunk_size <= context.num_pixels) start_index + context.chunk_size else context.num_pixels;
 
     var idx: i32 = start_index;
-    // c.SDL_Log("idx: %d", idx);
-    // c.SDL_Log("start_index: %d", start_index);
-    // c.SDL_Log("end_index: %d", end_index);
     while (idx < end_index) : (idx += 1) {
-        // c.SDL_Log("run in loop %d", idx);
         const w = @mod(idx, window_width);
         const h = @divTrunc(idx, window_width);
         var sample: i32 = 0;
@@ -171,11 +167,12 @@ fn renderFn(context: *ThreadContext) void {
         color_accum = color_accum.mul(1.0 / @intToFloat(f32, num_samples));
         setPixel(context.surface, w, window_height - h - 1, toBgra(@floatToInt(u32, 255.99 * color_accum.x), @floatToInt(u32, 255.99 * color_accum.y), @floatToInt(u32, 255.99 * color_accum.z)));
     }
+    mutex.lock();
+    defer mutex.unlock();
+    threadDones += 1;
 }
 
 pub fn main() !void {
-    std.log.info("in main", .{});
-    c.SDL_Log("hogeee");
     if (c.SDL_Init(c.SDL_INIT_VIDEO) != 0) {
         c.SDL_Log("Unable to initialize SDL: %s", c.SDL_GetError());
         return error.SDLInitializationFailed;
@@ -238,14 +235,12 @@ pub fn main() !void {
     }
 
     {
-        std.log.info("start", .{});
-        c.SDL_Log("start");
         _ = c.SDL_LockSurface(surface);
 
-        // var tasks = ArrayList(*const std.Thread).init(std.testing.allocator);
-        // defer tasks.deinit();
-        // var contexts = ArrayList(ThreadContext).init(std.testing.allocator);
-        // defer contexts.deinit();
+        var tasks = ArrayList(*std.Thread).init(std.testing.allocator);
+        defer tasks.deinit();
+        var contexts = ArrayList(ThreadContext).init(std.testing.allocator);
+        defer contexts.deinit();
 
         const chunk_size = blk: {
             const num_pixels = window_width * window_height;
@@ -258,12 +253,10 @@ pub fn main() !void {
             }
         };
 
-{
+        {
             var ithread: i32 = 0;
             while (ithread < num_threads) : (ithread += 1) {
-                c.SDL_Log("setThread: %d", ithread);
-                
-                var threadContext = ThreadContext{
+                try contexts.append(ThreadContext{
                     .thread_index = ithread,
                     .num_pixels = window_width * window_height,
                     .chunk_size = chunk_size,
@@ -271,12 +264,16 @@ pub fn main() !void {
                     .surface = surface,
                     .world = &world,
                     .camera = &camera,
-                };
-                const thread = try std.Thread.spawn(.{}, renderFn, .{&threadContext});
-                thread.join();
-                // try tasks.append(&thread);
+                });
+                var thread = try std.Thread.spawn(.{}, renderFn, .{&contexts.items[@intCast(usize, ithread)]});
+                try tasks.append(&thread);
             }
         }
+
+        while (threadDones < num_threads) {
+            c.SDL_Delay(1000);
+        }
+        
 
         c.SDL_UnlockSurface(surface);
     }
